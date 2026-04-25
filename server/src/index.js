@@ -26,6 +26,36 @@ app.use(
 );
 app.use(express.json({ limit: "2mb" }));
 
+let isConnected = false;
+async function resolveMongoUri() {
+  if (process.env.USE_MEMORY_DB === "1") {
+    const mem = await MongoMemoryServer.create();
+    const uri = mem.getUri();
+    console.log("Using in-memory MongoDB (USE_MEMORY_DB=1)");
+    return uri;
+  }
+  return process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/curalink";
+}
+
+async function connectToDatabase() {
+  if (isConnected) return;
+  const uri = await resolveMongoUri();
+  await mongoose.connect(uri);
+  isConnected = true;
+  console.log("MongoDB connected");
+}
+
+// Serverless DB connection middleware
+app.use(async (req, res, next) => {
+  try {
+    await connectToDatabase();
+    next();
+  } catch (err) {
+    console.error("Database connection error:", err);
+    res.status(500).json({ error: "Database connection failed" });
+  }
+});
+
 async function ollamaReachable() {
   const bases = process.env.OLLAMA_API_KEY?.trim()
     ? [
@@ -77,27 +107,13 @@ app.get("/api/meta", (_req, res) => {
   });
 });
 
-async function resolveMongoUri() {
-  if (process.env.USE_MEMORY_DB === "1") {
-    const mem = await MongoMemoryServer.create();
-    const uri = mem.getUri();
-    console.log("Using in-memory MongoDB (USE_MEMORY_DB=1)");
-    return uri;
-  }
-  return process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/curalink";
+// Local Development Server
+if (!process.env.VERCEL) {
+  connectToDatabase().then(() => {
+    app.listen(PORT, () => {
+      console.log(`CuraLink API listening on :${PORT}`);
+    });
+  }).catch(console.error);
 }
 
-async function main() {
-  const uri = await resolveMongoUri();
-  await mongoose.connect(uri);
-  console.log("MongoDB connected");
-
-  app.listen(PORT, () => {
-    console.log(`CuraLink API listening on :${PORT}`);
-  });
-}
-
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+export default app;
