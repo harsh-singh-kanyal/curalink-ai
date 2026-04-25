@@ -1,0 +1,42 @@
+services:
+  # -------------------------
+  # BACKEND SERVER (Node.js)
+  # -------------------------
+  - type: web
+    name: curalink-server
+    env: node
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CLIENT_ORIGIN
+        # Update this later to your deployed frontend URL (Render or Vercel)
+        value: https://curalink-client.onrender.com
+      - key: MONGODB_URI
+        # IMPORTANT: Set this in the Render dashboard to your MongoDB Atlas connection string!
+        sync: false
+      - key: OLLAMA_API_KEY
+        # IMPORTANT: Set this to your external Ollama provider key if applicable
+        sync: false
+      - key: OLLAMA_URL
+        # Set to cloud hosted Ollama URL
+        sync: false
+
+  # -------------------------
+  # FRONTEND CLIENT (Vite/React)
+  # -------------------------
+  - type: web
+    name: curalink-client
+    env: static
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_URL
+        # This points to the Render backend service name above
+        # If your backend gets a different URL on Render, update it here.
+        value: https://curalink-server.onrender.com
